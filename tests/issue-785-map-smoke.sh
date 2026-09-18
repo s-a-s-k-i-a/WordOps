@@ -5,7 +5,6 @@ nginx_bin=${NGINX_BIN:-nginx}
 repo_dir=$(cd "$(dirname "$0")/.." && pwd)
 probe_dir=$(mktemp -d)
 mkdir -p "$probe_dir/logs"
-ln -s "$repo_dir/wo/cli/templates/map-wp.mustache" "$probe_dir/map-wp.conf"
 trap '"$nginx_bin" -p "$probe_dir/" -c "$repo_dir/tests/issue-785-map.conf" -s quit >/dev/null 2>&1 || true' EXIT
 
 "$nginx_bin" -p "$probe_dir/" -c "$repo_dir/tests/issue-785-map.conf" -t
