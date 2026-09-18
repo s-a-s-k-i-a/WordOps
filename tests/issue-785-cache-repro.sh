@@ -2,7 +2,8 @@
 set -euo pipefail
 
 probe_dir=$(mktemp -d)
-trap 'nginx -p "$probe_dir/" -c nginx.conf -s quit >/dev/null 2>&1 || true' EXIT
+nginx_bin=${NGINX_BIN:-nginx}
+trap '"$nginx_bin" -p "$probe_dir/" -c nginx.conf -s quit >/dev/null 2>&1 || true' EXIT
 mkdir -p "$probe_dir/logs"
 
 cat > "$probe_dir/nginx.conf" <<'NGINX'
@@ -25,9 +26,9 @@ http {
 }
 NGINX
 
-nginx -V 2>&1
-nginx -p "$probe_dir/" -c nginx.conf -t
-nginx -p "$probe_dir/" -c nginx.conf
+"$nginx_bin" -V 2>&1
+"$nginx_bin" -p "$probe_dir/" -c nginx.conf -t
+"$nginx_bin" -p "$probe_dir/" -c nginx.conf
 
 set +e
 curl --silent --show-error --max-time 5 -o "$probe_dir/bypass.body" -w 'bypass HTTP %{http_code}\n' 'http://127.0.0.1:18085/bypass'
@@ -43,4 +44,10 @@ else
     printf 'Cache request failed with curl exit %s\n' "$cache_result"
 fi
 sed -n '1,120p' "$probe_dir/logs/error.log"
+if test "${EXPECT_CRASH:-0}" = 1; then
+    test "$cache_result" -ne 0
+    grep -q 'exited on signal 11' "$probe_dir/logs/error.log"
+    printf 'Expected crash reproduced.\n'
+    exit 0
+fi
 exit "$cache_result"

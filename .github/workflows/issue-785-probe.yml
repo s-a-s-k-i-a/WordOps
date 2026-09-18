@@ -24,4 +24,41 @@ jobs:
           sudo apt-get install -y nginx-custom
           apt-cache policy nginx-custom
       - name: Exercise set-misc cache key
-        run: sudo bash tests/issue-785-cache-repro.sh
+        run: sudo EXPECT_CRASH=1 bash tests/issue-785-cache-repro.sh
+
+  core-patch-probe:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        patched: ['no', 'yes']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build isolated Nginx with package NDK and set-misc modules
+        env:
+          PATCHED: ${{ matrix.patched }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libpcre2-dev zlib1g-dev libssl-dev
+          mkdir -p "$RUNNER_TEMP/issue-785"
+          cd "$RUNNER_TEMP/issue-785"
+          curl -fsSLO https://nginx.org/download/nginx-1.30.5.tar.gz
+          curl -fLsS -o modules.tar.xz 'https://launchpad.net/~wordops/+archive/ubuntu/nginx-wo/+sourcefiles/nginx/1.30.5-1ppa~stable~bpo24.04.1/nginx_1.30.5-1ppa~stable~bpo24.04.1.debian.tar.xz'
+          tar -xzf nginx-1.30.5.tar.gz
+          tar -xJf modules.tar.xz debian/modules/ngx_devel_kit debian/modules/set-misc-nginx-module
+          cd nginx-1.30.5
+          if [ "$PATCHED" = yes ]; then
+            curl -fLsS -o "$RUNNER_TEMP/issue-785/core.patch" https://github.com/nginx/nginx/commit/4b90ec769235877ece7e104d992d17db665806da.patch
+            patch -p1 < "$RUNNER_TEMP/issue-785/core.patch"
+          fi
+          ./configure --with-http_ssl_module --add-module="$RUNNER_TEMP/issue-785/debian/modules/ngx_devel_kit" --add-module="$RUNNER_TEMP/issue-785/debian/modules/set-misc-nginx-module"
+          make -j2
+      - name: Exercise patched or unpatched source
+        env:
+          PATCHED: ${{ matrix.patched }}
+        run: |
+          if [ "$PATCHED" = yes ]; then
+            NGINX_BIN="$RUNNER_TEMP/issue-785/nginx-1.30.5/objs/nginx" bash tests/issue-785-cache-repro.sh
+          else
+            NGINX_BIN="$RUNNER_TEMP/issue-785/nginx-1.30.5/objs/nginx" EXPECT_CRASH=1 bash tests/issue-785-cache-repro.sh
+          fi
