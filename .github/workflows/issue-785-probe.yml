@@ -1,0 +1,27 @@
+name: Issue 785 isolated Nginx probe
+
+on:
+  push:
+    branches:
+      - codex/issue-785-redis-page-cache
+
+permissions:
+  contents: read
+
+jobs:
+  package-probe:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install WordOps Nginx package
+        run: |
+          sudo add-apt-repository -y ppa:wordops/nginx-wo
+          sudo apt-get update
+          sudo apt-get install -y nginx-custom
+          apt-cache policy nginx-custom
+      - name: Exercise set-misc cache key
+        run: sudo bash tests/issue-785-cache-repro.sh
