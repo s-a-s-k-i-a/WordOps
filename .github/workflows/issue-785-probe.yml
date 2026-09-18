@@ -62,3 +62,6 @@ jobs:
           else
             NGINX_BIN="$RUNNER_TEMP/issue-785/nginx-1.30.5/objs/nginx" EXPECT_CRASH=1 bash tests/issue-785-cache-repro.sh
           fi
+      - name: Check WordOps private-route map
+        if: matrix.patched == 'yes'
+        run: NGINX_BIN="$RUNNER_TEMP/issue-785/nginx-1.30.5/objs/nginx" bash tests/issue-785-map-smoke.sh
